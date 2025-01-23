@@ -121,4 +121,30 @@ describe('Bun Serve Integration', () => {
 
     server.stop();
   });
+
+  test("intruments the server again if it is reloaded", async () => {
+    client.on('spanEnd', span => {
+      expect(spanToJSON(span).status).toBe('ok');
+      expect(spanToJSON(span).data?.['http.response.status_code']).toEqual(200);
+      expect(spanToJSON(span).op).toEqual('http.server');
+      expect(spanToJSON(span).description).toEqual('GET /');
+    });
+
+    const server = Bun.serve({
+      async fetch(_req) {
+        return new Response('Bun!');
+      },
+      port: DEFAULT_PORT,
+    });
+
+    server.reload({
+      async fetch(_req) {
+        return new Response('Reloaded Bun!');
+      },
+    })
+
+    await fetch('http://localhost:22114/');
+
+    server.stop();
+  })
 });

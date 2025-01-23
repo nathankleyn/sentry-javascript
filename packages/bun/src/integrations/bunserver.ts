@@ -47,7 +47,18 @@ export function instrumentBunServe(): void {
   Bun.serve = new Proxy(Bun.serve, {
     apply(serveTarget, serveThisArg, serveArgs: Parameters<typeof Bun.serve>) {
       instrumentBunServeOptions(serveArgs[0]);
-      return serveTarget.apply(serveThisArg, serveArgs);
+      const server = serveTarget.apply(serveThisArg, serveArgs);
+
+      // A Bun server can be reloaded, re-wrap any fetch function passed to it
+      // We can't use a Proxy for this as Bun does `instanceof` checks internally that fail if we
+      // wrap the Server instance.
+      const originalReload = server.reload;
+      server.reload = (serveOptions: Parameters<typeof Bun.serve>[0]) => {
+        instrumentBunServeOptions(serveOptions);
+        return originalReload.call(server, serveOptions);
+      }
+
+      return server;
     },
   });
 }
